@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+    <t t-name="crm_dashboard_extension.KpiCard">
+        <article class="o_crm_dashboard_kpi card">
+            <div class="o_crm_dashboard_kpi_icon" t-att-class="'o_kpi_' + props.kpi.key">
+                <i class="fa fa-line-chart"/>
+            </div>
+            <div>
+                <div class="o_crm_dashboard_kpi_label"><t t-esc="props.kpi.label"/></div>
+                <div class="o_crm_dashboard_kpi_value">
+                    <t t-if="props.kpi.format === 'currency'"><t t-esc="props.currency"/> <t t-esc="props.kpi.value.toLocaleString(undefined, {maximumFractionDigits: 2})"/></t>
+                    <t t-elif="props.kpi.format === 'percent'"><t t-esc="props.kpi.value"/>%</t>
+                    <t t-else=""><t t-esc="props.kpi.value.toLocaleString()"/></t>
+                </div>
+            </div>
+        </article>
+    </t>
+
+    <t t-name="crm_dashboard_extension.DashboardChart">
+        <section class="o_crm_dashboard_panel card">
+            <div class="o_crm_dashboard_panel_header"><h3><t t-esc="props.title"/></h3></div>
+            <div class="o_crm_dashboard_chart_body">
+                <t t-if="props.rows.length">
+                    <t t-foreach="props.rows" t-as="row" t-key="row.label">
+                        <div class="o_crm_dashboard_chart_row">
+                            <div class="o_crm_dashboard_chart_label"><t t-esc="row.label"/></div>
+                            <div class="o_crm_dashboard_chart_track">
+                                <div class="o_crm_dashboard_chart_bar" t-att-style="'width: ' + barWidth(row.value) + '%'"/>
+                            </div>
+                            <div class="o_crm_dashboard_chart_value"><t t-esc="row.value.toLocaleString()"/></div>
+                        </div>
+                    </t>
+                </t>
+                <p t-else="" class="text-muted mb-0"><t t-esc="props.noData"/></p>
+            </div>
+        </section>
+    </t>
+
+    <t t-name="crm_dashboard_extension.DashboardTable">
+        <section class="o_crm_dashboard_panel card">
+            <div class="o_crm_dashboard_panel_header"><h3><t t-esc="props.title"/></h3></div>
+            <div class="table-responsive">
+                <table class="table table-hover o_crm_dashboard_table mb-0">
+                    <thead><tr><t t-foreach="props.columns" t-as="column" t-key="column.key"><th><t t-esc="column.label"/></th></t></tr></thead>
+                    <tbody>
+                        <t t-if="props.rows.length">
+                            <t t-foreach="props.rows" t-as="row" t-key="row_index">
+                                <tr><t t-foreach="props.columns" t-as="column" t-key="column.key"><td><t t-esc="format(row[column.key], column)"/></td></t></tr>
+                            </t>
+                        </t>
+                        <tr t-else=""><td t-att-colspan="props.columns.length" class="text-muted"><t t-esc="props.noData"/></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </t>
+
+    <t t-name="crm_dashboard_extension.CrmDashboard">
+        <div class="o_crm_dashboard">
+            <div class="o_crm_dashboard_header">
+                <div><h1><t t-esc="labels.title"/></h1><p><t t-esc="labels.subtitle"/></p></div>
+                <div class="o_crm_dashboard_actions">
+                    <select class="form-select" t-on-change="onDateRangeChange" t-att-disabled="state.loading">
+                        <option value="all" t-att-selected="state.filters.dateRange === 'all'"><t t-esc="labels.allTime"/></option>
+                        <option value="7" t-att-selected="state.filters.dateRange === '7'"><t t-esc="labels.last7"/></option>
+                        <option value="30" t-att-selected="state.filters.dateRange === '30'"><t t-esc="labels.last30"/></option>
+                        <option value="90" t-att-selected="state.filters.dateRange === '90'"><t t-esc="labels.last90"/></option>
+                    </select>
+                    <select class="form-select" t-on-change="onTeamChange" t-att-disabled="state.loading">
+                        <option value="" t-att-selected="!state.filters.teamId"><t t-esc="labels.allTeams"/></option>
+                        <t t-foreach="state.data ? state.data.teams : []" t-as="team" t-key="team.id">
+                            <option t-att-value="team.id" t-att-selected="state.filters.teamId === team.id"><t t-esc="team.name"/></option>
+                        </t>
+                    </select>
+                    <button class="btn btn-primary" t-on-click="refresh" t-att-disabled="state.loading"><i class="fa fa-refresh me-1"/> <t t-esc="labels.refresh"/></button>
+                </div>
+            </div>
+            <div t-if="state.loading" class="o_crm_dashboard_loading"><i class="fa fa-spinner fa-spin fa-2x"/><span><t t-esc="labels.loading"/></span></div>
+            <div t-elif="state.error" class="alert alert-danger"><t t-esc="labels.unavailable"/></div>
+            <t t-elif="state.data">
+                <div class="o_crm_dashboard_kpis"><t t-foreach="localizedKpis()" t-as="kpi" t-key="kpi.key"><KpiCard kpi="kpi" currency="state.data.currency_symbol"/></t></div>
+                <div class="o_crm_dashboard_grid o_crm_dashboard_grid_top">
+                    <DashboardChart title="labels.pipelineStage" noData="labels.noData" rows="chartRows(state.data.pipeline, 'stage_name', 'opportunity_count')"/>
+                    <DashboardChart title="labels.leadSources" noData="labels.noData" rows="chartRows(sourceRows(), 'source_name', 'opportunity_count')"/>
+                </div>
+                <div class="o_crm_dashboard_grid o_crm_dashboard_grid_top">
+                    <DashboardTable title="labels.pipelineAnalysis" noData="labels.noData" rows="state.data.pipeline" currency="state.data.currency_symbol" columns="columns.pipeline"/>
+                    <DashboardTable title="labels.activitiesOverview" noData="labels.noData" rows="activityRows(state.data.activities)" currency="state.data.currency_symbol" columns="columns.activities"/>
+                </div>
+                <DashboardTable title="labels.salespersonPerformance" noData="labels.noData" rows="state.data.salesperson" currency="state.data.currency_symbol" columns="columns.salesperson"/>
+                <DashboardTable title="labels.topOpportunities" noData="labels.noData" rows="state.data.top_opportunities" currency="state.data.currency_symbol" columns="columns.topOpportunities"/>
+                <div class="o_crm_dashboard_grid o_crm_dashboard_grid_bottom">
+                    <DashboardTable title="labels.opportunityAging" noData="labels.noData" rows="localizedAging()" currency="state.data.currency_symbol" columns="columns.aging"/>
+                    <DashboardTable title="labels.leadSourceAnalysis" noData="labels.noData" rows="sourceRows()" currency="state.data.currency_symbol" columns="columns.source"/>
+                </div>
+            </t>
+        </div>
+    </t>
+</templates>

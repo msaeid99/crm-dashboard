@@ -1,0 +1,110 @@
+# Translation of Odoo Server.
+msgid ""
+msgstr ""
+"Project-Id-Version: Odoo 17.0\n"
+"Language: ar_001\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+#. module: crm_dashboard_extension
+msgid "CRM Dashboard"
+msgstr "لوحة تحكم CRM"
+#. module: crm_dashboard_extension
+msgid "Monitor pipeline health, revenue and team performance."
+msgstr "تابع حالة خط المبيعات والإيرادات وأداء الفريق."
+#. module: crm_dashboard_extension
+msgid "All time"
+msgstr "كل الفترات"
+#. module: crm_dashboard_extension
+msgid "Last 7 days"
+msgstr "آخر 7 أيام"
+#. module: crm_dashboard_extension
+msgid "Last 30 days"
+msgstr "آخر 30 يومًا"
+#. module: crm_dashboard_extension
+msgid "Last 90 days"
+msgstr "آخر 90 يومًا"
+#. module: crm_dashboard_extension
+msgid "All teams"
+msgstr "كل الفرق"
+#. module: crm_dashboard_extension
+msgid "Refresh"
+msgstr "تحديث"
+#. module: crm_dashboard_extension
+msgid "Loading dashboard..."
+msgstr "جارٍ تحميل لوحة التحكم..."
+#. module: crm_dashboard_extension
+msgid "Dashboard data could not be loaded."
+msgstr "تعذر تحميل بيانات لوحة التحكم."
+#. module: crm_dashboard_extension
+msgid "Pipeline by Stage"
+msgstr "خط المبيعات حسب المرحلة"
+#. module: crm_dashboard_extension
+msgid "Lead Sources"
+msgstr "مصادر العملاء المحتملين"
+#. module: crm_dashboard_extension
+msgid "Pipeline Analysis"
+msgstr "تحليل خط المبيعات"
+#. module: crm_dashboard_extension
+msgid "Activities Overview"
+msgstr "ملخص الأنشطة"
+#. module: crm_dashboard_extension
+msgid "Salesperson Performance"
+msgstr "أداء مندوبي المبيعات"
+#. module: crm_dashboard_extension
+msgid "Top Opportunities"
+msgstr "أعلى الفرص"
+#. module: crm_dashboard_extension
+msgid "Opportunity Aging"
+msgstr "عمر الفرص"
+#. module: crm_dashboard_extension
+msgid "Lead Source Analysis"
+msgstr "تحليل مصادر العملاء"
+#. module: crm_dashboard_extension
+msgid "No data available."
+msgstr "لا توجد بيانات."
+#. module: crm_dashboard_extension
+msgid "Total Activities"
+msgstr "إجمالي الأنشطة"
+#. module: crm_dashboard_extension
+msgid "Completed Activities"
+msgstr "الأنشطة المكتملة"
+#. module: crm_dashboard_extension
+msgid "Pending Activities"
+msgstr "الأنشطة المعلقة"
+#. module: crm_dashboard_extension
+msgid "Overdue Activities"
+msgstr "الأنشطة المتأخرة"
+#. module: crm_dashboard_extension
+msgid "Total Leads"
+msgstr "إجمالي العملاء المحتملين"
+#. module: crm_dashboard_extension
+msgid "Total Opportunities"
+msgstr "إجمالي الفرص"
+#. module: crm_dashboard_extension
+msgid "Expected Revenue"
+msgstr "الإيراد المتوقع"
+#. module: crm_dashboard_extension
+msgid "Won Opportunities"
+msgstr "الفرص الرابحة"
+#. module: crm_dashboard_extension
+msgid "Lost Opportunities"
+msgstr "الفرص الخاسرة"
+#. module: crm_dashboard_extension
+msgid "Conversion Rate"
+msgstr "معدل التحويل"
+#. module: crm_dashboard_extension
+msgid "Undefined"
+msgstr "غير محدد"
+#. module: crm_dashboard_extension
+msgid "Unassigned"
+msgstr "غير مُسند"
+#. module: crm_dashboard_extension
+msgid "0-30 days"
+msgstr "من 0 إلى 30 يومًا"
+#. module: crm_dashboard_extension
+msgid "30-60 days"
+msgstr "من 30 إلى 60 يومًا"
+#. module: crm_dashboard_extension
+msgid "60+ days"
+msgstr "أكثر من 60 يومًا"
