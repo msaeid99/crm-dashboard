@@ -1,7 +1,7 @@
 {
     "name": "CRM Dashboard Extension",
     "summary": "Professional dashboard for the existing CRM application",
-    "version": "17.0.1.0.1",
+    "version": "17.0.1.0.2",
     "category": "Sales/CRM",
     "author": "Custom",
     "license": "LGPL-3",

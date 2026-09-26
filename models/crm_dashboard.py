@@ -29,30 +29,49 @@ class CrmDashboard(models.AbstractModel):
 
         total_leads = lead_model.search_count(lead_domain)
         won_stage_ids = self.env["crm.stage"].search([("is_won", "=", True)]).ids
+        # This database models losses as a regular pipeline stage named
+        # "Lost" instead of archiving the opportunity through action_set_lost.
+        # Support that workflow while retaining Odoo's standard archived-loss
+        # behaviour as a fallback for databases without such a stage.
+        lost_stage_ids = self.env["crm.stage"].search(
+            [("name", "=ilike", "Lost")]
+        ).ids
         won_domain = opportunity_scope + [
+            ("active", "=", True),
             "|",
             ("stage_id", "in", won_stage_ids),
             ("probability", "=", 100),
         ]
-        # Mark Lost sets both active=False and probability=0.  Testing active
-        # alone also counted archived/merged/won records as lost.
-        lost_domain = opportunity_scope + [
-            ("active", "=", False),
-            ("probability", "=", 0),
-        ]
+        if lost_stage_ids:
+            lost_domain = opportunity_scope + [
+                ("active", "=", True),
+                ("stage_id", "in", lost_stage_ids),
+            ]
+        else:
+            lost_domain = opportunity_scope + [
+                ("active", "=", False),
+                ("probability", "=", 0),
+            ]
         pipeline_domain = opportunity_scope + [
             ("active", "=", True),
             ("stage_id", "not in", won_stage_ids),
+            ("stage_id", "not in", lost_stage_ids),
             ("probability", "<", 100),
         ]
-        total_opportunities = lead_model.search_count(opportunity_scope)
+        total_opportunities = lead_model.search_count(
+            opportunity_scope + [("active", "=", True)]
+        )
         expected_revenue = self._sum_expected_revenue(lead_model, pipeline_domain)
         won_opportunities = lead_model.search_count(won_domain)
         lost_opportunities = lead_model.search_count(lost_domain)
 
         pipeline = self._pipeline(lead_model, pipeline_domain)
         salesperson = self._salesperson_performance(
-            lead_model, opportunity_scope, pipeline_domain, won_stage_ids
+            lead_model,
+            opportunity_scope,
+            pipeline_domain,
+            won_stage_ids,
+            lost_stage_ids,
         )
         source = self._source_analysis(lead_model, pipeline_domain)
         activities = self._activities_overview()
@@ -115,7 +134,9 @@ class CrmDashboard(models.AbstractModel):
             for group in groups
         ]
 
-    def _salesperson_performance(self, model, domain, pipeline_domain, won_stage_ids):
+    def _salesperson_performance(
+        self, model, domain, pipeline_domain, won_stage_ids, lost_stage_ids
+    ):
         groups = model.read_group(
             domain, ["user_id", "expected_revenue:sum"], ["user_id"], lazy=False
         )
@@ -126,14 +147,21 @@ class CrmDashboard(models.AbstractModel):
             user_name = user_value[1] if user_value else _("Unassigned")
             user_domain = domain + [("user_id", "=", user_id)]
             won_domain = user_domain + [
+                ("active", "=", True),
                 "|",
                 ("stage_id", "in", won_stage_ids),
                 ("probability", "=", 100),
             ]
-            lost_domain = user_domain + [
-                ("active", "=", False),
-                ("probability", "=", 0),
-            ]
+            if lost_stage_ids:
+                lost_domain = user_domain + [
+                    ("active", "=", True),
+                    ("stage_id", "in", lost_stage_ids),
+                ]
+            else:
+                lost_domain = user_domain + [
+                    ("active", "=", False),
+                    ("probability", "=", 0),
+                ]
             rows.append(
                 {
                     "user_name": user_name,
