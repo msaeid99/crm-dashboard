@@ -17,17 +17,13 @@ class CrmDashboard(models.AbstractModel):
         # see them, while pipeline/revenue queries must explicitly select only
         # live records.
         opportunity_scope = [("type", "=", "opportunity")]
-        lead_domain = [("type", "=", "lead")]
         if date_range in {"7", "30", "90"}:
             since = fields.Datetime.now() - timedelta(days=int(date_range))
             date_domain = [("create_date", ">=", fields.Datetime.to_string(since))]
             opportunity_scope += date_domain
-            lead_domain += date_domain
         if team_id:
             opportunity_scope.append(("team_id", "=", int(team_id)))
-            lead_domain.append(("team_id", "=", int(team_id)))
 
-        total_leads = lead_model.search_count(lead_domain)
         won_stage_ids = self.env["crm.stage"].search([("is_won", "=", True)]).ids
         # This database models losses as a regular pipeline stage named
         # "Lost" instead of archiving the opportunity through action_set_lost.
@@ -86,12 +82,10 @@ class CrmDashboard(models.AbstractModel):
         return {
             "currency_symbol": self.env.company.currency_id.symbol or "",
             "kpis": [
-                {"key": "total_leads", "label": _("Total Leads"), "value": total_leads, "format": "integer"},
                 {"key": "total_opportunities", "label": _("Total Opportunities"), "value": total_opportunities, "format": "integer"},
                 {"key": "expected_revenue", "label": _("Expected Revenue"), "value": expected_revenue, "format": "currency"},
                 {"key": "won_opportunities", "label": _("Won Opportunities"), "value": won_opportunities, "format": "integer"},
                 {"key": "lost_opportunities", "label": _("Lost Opportunities"), "value": lost_opportunities, "format": "integer"},
-                {"key": "conversion_rate", "label": _("Conversion Rate"), "value": self._percentage(won_opportunities, total_opportunities), "format": "percent"},
             ],
             "pipeline": pipeline,
             "salesperson": salesperson,
