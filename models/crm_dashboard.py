@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import timedelta
 
 from odoo import _, api, fields, models
 
@@ -12,42 +12,59 @@ class CrmDashboard(models.AbstractModel):
     @api.model
     def get_dashboard_data(self, date_range="all", team_id=False):
         lead_model = self.env["crm.lead"].with_context(active_test=False)
-        opportunity_domain = [("type", "=", "opportunity")]
+        # Keep the common scope free of an ``active`` condition.  Lost CRM
+        # opportunities are archived by Odoo, so we need active_test=False to
+        # see them, while pipeline/revenue queries must explicitly select only
+        # live records.
+        opportunity_scope = [("type", "=", "opportunity")]
         lead_domain = [("type", "=", "lead")]
         if date_range in {"7", "30", "90"}:
             since = fields.Datetime.now() - timedelta(days=int(date_range))
             date_domain = [("create_date", ">=", fields.Datetime.to_string(since))]
-            opportunity_domain += date_domain
+            opportunity_scope += date_domain
             lead_domain += date_domain
         if team_id:
-            opportunity_domain.append(("team_id", "=", int(team_id)))
+            opportunity_scope.append(("team_id", "=", int(team_id)))
             lead_domain.append(("team_id", "=", int(team_id)))
 
         total_leads = lead_model.search_count(lead_domain)
-        total_opportunities = lead_model.search_count(opportunity_domain)
-        expected_revenue = self._sum_expected_revenue(lead_model, opportunity_domain)
-
         won_stage_ids = self.env["crm.stage"].search([("is_won", "=", True)]).ids
-        won_domain = opportunity_domain + [
+        won_domain = opportunity_scope + [
             "|",
             ("stage_id", "in", won_stage_ids),
             ("probability", "=", 100),
         ]
-        lost_domain = opportunity_domain + [("active", "=", False)]
+        # Mark Lost sets both active=False and probability=0.  Testing active
+        # alone also counted archived/merged/won records as lost.
+        lost_domain = opportunity_scope + [
+            ("active", "=", False),
+            ("probability", "=", 0),
+        ]
+        pipeline_domain = opportunity_scope + [
+            ("active", "=", True),
+            ("stage_id", "not in", won_stage_ids),
+            ("probability", "<", 100),
+        ]
+        total_opportunities = lead_model.search_count(opportunity_scope)
+        expected_revenue = self._sum_expected_revenue(lead_model, pipeline_domain)
         won_opportunities = lead_model.search_count(won_domain)
         lost_opportunities = lead_model.search_count(lost_domain)
 
-        pipeline = self._pipeline(lead_model, opportunity_domain)
+        pipeline = self._pipeline(lead_model, pipeline_domain)
         salesperson = self._salesperson_performance(
-            lead_model, opportunity_domain, won_stage_ids
+            lead_model, opportunity_scope, pipeline_domain, won_stage_ids
         )
-        source = self._source_analysis(lead_model, opportunity_domain)
+        source = self._source_analysis(lead_model, pipeline_domain)
         activities = self._activities_overview()
-        aging = self._aging(lead_model, opportunity_domain)
-        top_opportunities = self._top_opportunities(lead_model, opportunity_domain)
+        aging = self._aging(lead_model, pipeline_domain)
+        top_opportunities = self._top_opportunities(lead_model, pipeline_domain)
+        team_model = self.env["crm.team"]
+        team_domain = [("company_id", "in", [False, self.env.company.id])]
+        if "use_opportunities" in team_model._fields:
+            team_domain.append(("use_opportunities", "=", True))
         teams = [
             {"id": team.id, "name": team.name}
-            for team in self.env["crm.team"].search([], order="name")
+            for team in team_model.search(team_domain, order="name")
         ]
 
         return {
@@ -98,7 +115,7 @@ class CrmDashboard(models.AbstractModel):
             for group in groups
         ]
 
-    def _salesperson_performance(self, model, domain, won_stage_ids):
+    def _salesperson_performance(self, model, domain, pipeline_domain, won_stage_ids):
         groups = model.read_group(
             domain, ["user_id", "expected_revenue:sum"], ["user_id"], lazy=False
         )
@@ -113,12 +130,17 @@ class CrmDashboard(models.AbstractModel):
                 ("stage_id", "in", won_stage_ids),
                 ("probability", "=", 100),
             ]
-            lost_domain = user_domain + [("active", "=", False)]
+            lost_domain = user_domain + [
+                ("active", "=", False),
+                ("probability", "=", 0),
+            ]
             rows.append(
                 {
                     "user_name": user_name,
                     "opportunity_count": group.get("__count", 0),
-                    "expected_revenue": self._group_sum(group, "expected_revenue"),
+                    "expected_revenue": self._sum_expected_revenue(
+                        model, pipeline_domain + [("user_id", "=", user_id)]
+                    ),
                     "won_opportunities": model.search_count(won_domain),
                     "lost_opportunities": model.search_count(lost_domain),
                     "conversion_rate": self._percentage(
