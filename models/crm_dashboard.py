@@ -52,31 +52,28 @@ class CrmDashboard(models.AbstractModel):
                 ("active", "=", False),
                 ("probability", "=", 0),
             ]
-        pipeline_domain = opportunity_scope + [
-            ("active", "=", True),
-            ("stage_id", "not in", won_stage_ids),
-            ("stage_id", "not in", lost_stage_ids),
-            ("probability", "<", 100),
-        ]
-        total_opportunities = lead_model.search_count(
-            opportunity_scope + [("active", "=", True)]
+        active_opportunity_domain = opportunity_scope + [("active", "=", True)]
+        total_opportunities = lead_model.search_count(active_opportunity_domain)
+        expected_revenue = self._sum_expected_revenue(
+            lead_model, active_opportunity_domain
         )
-        expected_revenue = self._sum_expected_revenue(lead_model, pipeline_domain)
         won_opportunities = lead_model.search_count(won_domain)
         lost_opportunities = lead_model.search_count(lost_domain)
 
-        pipeline = self._pipeline(lead_model, pipeline_domain)
+        pipeline = self._pipeline(lead_model, active_opportunity_domain)
         salesperson = self._salesperson_performance(
             lead_model,
-            opportunity_scope,
-            pipeline_domain,
+            active_opportunity_domain,
+            active_opportunity_domain,
             won_stage_ids,
             lost_stage_ids,
         )
-        source = self._source_analysis(lead_model, pipeline_domain)
+        source = self._source_analysis(lead_model, active_opportunity_domain)
         activities = self._activities_overview()
-        aging = self._aging(lead_model, pipeline_domain)
-        top_opportunities = self._top_opportunities(lead_model, pipeline_domain)
+        aging = self._aging(lead_model, active_opportunity_domain)
+        top_opportunities = self._top_opportunities(
+            lead_model, active_opportunity_domain
+        )
         team_model = self.env["crm.team"]
         team_domain = [("company_id", "in", [False, self.env.company.id])]
         if "use_opportunities" in team_model._fields:
@@ -115,13 +112,16 @@ class CrmDashboard(models.AbstractModel):
 
     @staticmethod
     def _sum_expected_revenue(model, domain):
-        result = model.read_group(domain, ["expected_revenue:sum"], [])
-        return CrmDashboard._group_sum(result[0], "expected_revenue") if result else 0.0
+        # Odoo's CRM Pipeline list labels the probability-weighted
+        # ``prorated_revenue`` total as Expected Revenue.  Use the same field
+        # so the dashboard KPI matches the native Pipeline footer.
+        result = model.read_group(domain, ["prorated_revenue:sum"], [])
+        return CrmDashboard._group_sum(result[0], "prorated_revenue") if result else 0.0
 
     def _pipeline(self, model, domain):
         groups = model.read_group(
             domain,
-            ["stage_id", "expected_revenue:sum"],
+            ["stage_id", "prorated_revenue:sum"],
             ["stage_id"],
             lazy=False,
         )
@@ -129,16 +129,16 @@ class CrmDashboard(models.AbstractModel):
             {
                 "stage_name": group["stage_id"][1] if group.get("stage_id") else _("Undefined"),
                 "opportunity_count": group.get("__count", 0),
-                "expected_revenue": self._group_sum(group, "expected_revenue"),
+                "expected_revenue": self._group_sum(group, "prorated_revenue"),
             }
             for group in groups
         ]
 
     def _salesperson_performance(
-        self, model, domain, pipeline_domain, won_stage_ids, lost_stage_ids
+        self, model, domain, revenue_domain, won_stage_ids, lost_stage_ids
     ):
         groups = model.read_group(
-            domain, ["user_id", "expected_revenue:sum"], ["user_id"], lazy=False
+            domain, ["user_id", "prorated_revenue:sum"], ["user_id"], lazy=False
         )
         rows = []
         for group in groups:
@@ -167,7 +167,7 @@ class CrmDashboard(models.AbstractModel):
                     "user_name": user_name,
                     "opportunity_count": group.get("__count", 0),
                     "expected_revenue": self._sum_expected_revenue(
-                        model, pipeline_domain + [("user_id", "=", user_id)]
+                        model, revenue_domain + [("user_id", "=", user_id)]
                     ),
                     "won_opportunities": model.search_count(won_domain),
                     "lost_opportunities": model.search_count(lost_domain),
@@ -181,13 +181,13 @@ class CrmDashboard(models.AbstractModel):
     @staticmethod
     def _source_analysis(model, domain):
         groups = model.read_group(
-            domain, ["source_id", "expected_revenue:sum"], ["source_id"], lazy=False
+            domain, ["source_id", "prorated_revenue:sum"], ["source_id"], lazy=False
         )
         return [
             {
                 "source_name": group["source_id"][1] if group.get("source_id") else _("Undefined"),
                 "opportunity_count": group.get("__count", 0),
-                "expected_revenue": CrmDashboard._group_sum(group, "expected_revenue"),
+                "expected_revenue": CrmDashboard._group_sum(group, "prorated_revenue"),
             }
             for group in groups
         ]
@@ -220,7 +220,7 @@ class CrmDashboard(models.AbstractModel):
                     "customer": opportunity.partner_id.name or _("—"),
                     "salesperson": opportunity.user_id.name or _("Unassigned"),
                     "stage": opportunity.stage_id.name or _("Undefined"),
-                    "expected_revenue": opportunity.expected_revenue or 0.0,
+                    "expected_revenue": opportunity.prorated_revenue or 0.0,
                     "probability": opportunity.probability or 0.0,
                     "age_days": max((now - created).days, 0),
                 }
@@ -249,5 +249,5 @@ class CrmDashboard(models.AbstractModel):
             else:
                 bucket = "60+ days"
             rows[bucket]["opportunity_count"] += 1
-            rows[bucket]["expected_revenue"] += opportunity.expected_revenue or 0.0
+            rows[bucket]["expected_revenue"] += opportunity.prorated_revenue or 0.0
         return list(rows.values())
